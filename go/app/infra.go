@@ -38,7 +38,7 @@ func NewItemRepository() ItemRepository {
 
 // Insert inserts an item into the repository.
 func (i *itemRepository) Insert(ctx context.Context, item *Item) error {
-	// STEP 4-1: add an implementation to store an item
+	// STEP 4-2: add an implementation to store an item
 	// 既存データの読み込み
 	items, err := i.loadItems()
 	if err != nil {
@@ -75,9 +75,21 @@ func (i *itemRepository) loadItems() ([]Item, error) {
 
 // saveItems saves items to the JSON file.
 func (i *itemRepository) saveItems(items []Item) error {
-	file, err := os.Create(i.fileName)
-	if err != nil {
-		return err
+	var file *os.File
+	// check if the file exists
+	if _, err := os.Stat(i.fileName); os.IsNotExist(err) {
+		// if the file doesn't exist, create it
+		file, err = os.Create(i.fileName)
+		if err != nil {
+			return err
+		}
+	} else {
+		// if the file exists, open it and overwrite it
+		// O_WRONLY: write only, O_TRUNC: truncate the file
+		file, err = os.OpenFile(i.fileName, os.O_WRONLY|os.O_TRUNC, 0644)
+		if err != nil {
+			return err
+		}
 	}
 	// defer make sure the file is closed after the function returns
 	defer file.Close()
@@ -85,7 +97,7 @@ func (i *itemRepository) saveItems(items []Item) error {
 	// make a new JSON encoder
 	encoder := json.NewEncoder(file)
 	// encode items to JSON and write it to the file
-	err = encoder.Encode(items)
+	err := encoder.Encode(items)
 	if err != nil {
 		return err
 	}
