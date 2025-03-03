@@ -32,7 +32,7 @@ type itemRepository struct {
 	fileName string
 }
 
-// NewItemReposit creates a new itemRepository.
+// NewItemRepository creates a new itemRepository.
 func NewItemRepository() ItemRepository {
 	return &itemRepository{fileName: "./db/items.json"}
 }
