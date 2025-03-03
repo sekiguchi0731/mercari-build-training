@@ -41,7 +41,6 @@ func NewItemRepository() ItemRepository {
 func (i *itemRepository) Insert(ctx context.Context, item *Item) error {
 	// STEP 4-1: add an implementation to store an item
 	// 既存データの読み込み
-	fmt.Println("here3")
 	items, err := i.loadItems()
 	if err != nil {
 		return err
