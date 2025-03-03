@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	// STEP 5-1: uncomment this line
 	// _ "github.com/mattn/go-sqlite3"
@@ -68,12 +67,8 @@ func (i *itemRepository) loadItems() ([]Item, error) {
 	// decode JSON from the file and store it in the items variable
 	err = decoder.Decode(&items)
 	if err != nil {
-		fmt.Println("decode error")
 		return nil, err
 	}
-
-	// debug print
-	fmt.Println(items)
 
 	return items, nil
 }
