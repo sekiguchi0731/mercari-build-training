@@ -34,14 +34,6 @@ type itemRepository struct {
 
 // NewItemReposit creates a new itemRepository.
 func NewItemRepository() ItemRepository {
-	wd, err := os.Getwd()
-	if err != nil {
-		fmt.Println(err)
-	} else {
-		fmt.Println(wd)
-	}
-	fmt.Println("here2")
-	fmt.Println(wd)
 	return &itemRepository{fileName: "./db/items.json"}
 }
 
@@ -54,8 +46,6 @@ func (i *itemRepository) Insert(ctx context.Context, item *Item) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("items:")
-	fmt.Println(items)
 
 	// 新規データの追加
 	items = append(items, *item)
@@ -70,8 +60,6 @@ func (i *itemRepository) loadItems() ([]Item, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("file")
-	fmt.Println(file)
 	// defer make sure the file is closed after the function returns
 	defer file.Close()
 
