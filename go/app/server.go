@@ -140,7 +140,6 @@ func (s *Handlers) AddItem(w http.ResponseWriter, r *http.Request) {
 		Name: req.Name,
 		Category: req.Category,
 		ImageName: fileName,
-		// STEP 4-4: add an image field
 	}
 	message := fmt.Sprintf("item received: %s, category received: %s, image name received: %s" , item.Name, item.Category, item.ImageName)
 	slog.Info(message)
