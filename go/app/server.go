@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"crypto/sha256"
+	"encoding/hex"
 )
 
 type Server struct {
@@ -92,6 +94,7 @@ func parseAddItemRequest(r *http.Request) (*AddItemRequest, error) {
 	req := &AddItemRequest{
 		Name: r.FormValue("name"),
 		Category: r.FormValue("category"),
+		Image: []byte(r.FormValue("image")),
 		// STEP 4-2: add a category field
 	}
 
@@ -106,7 +109,12 @@ func parseAddItemRequest(r *http.Request) (*AddItemRequest, error) {
 	if req.Category == "" {
 		return nil, errors.New("category is required")
 	}
+
 	// STEP 4-4: validate the image field
+	if req.Image == nil {
+		return nil, errors.New("image is required")
+	}
+
 	return req, nil
 }
 
@@ -121,20 +129,20 @@ func (s *Handlers) AddItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// STEP 4-4: uncomment on adding an implementation to store an image
-	// fileName, err := s.storeImage(req.Image)
-	// if err != nil {
-	// 	slog.Error("failed to store image: ", "error", err)
-	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-	// 	return
-	// }
+	fileName, err := s.storeImage(req.Image)
+	if err != nil {
+		slog.Error("failed to store image: ", "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	item := &Item{
 		Name: req.Name,
 		Category: req.Category,
-		// STEP 4-2: add a category field
+		ImageName: fileName,
 		// STEP 4-4: add an image field
 	}
-	message := fmt.Sprintf("item received: %s, category received: %s", item.Name, item.Category)
+	message := fmt.Sprintf("item received: %s, category received: %s, image name received: %s" , item.Name, item.Category, item.ImageName)
 	slog.Info(message)
 
 	// STEP 4-2: add an implementation to store an item
@@ -181,14 +189,35 @@ func (s *Handlers) GetItem(w http.ResponseWriter, r *http.Request) {
 // and stores it in the image directory.
 func (s *Handlers) storeImage(image []byte) (filePath string, err error) {
 	// STEP 4-4: add an implementation to store an image
-	// TODO:
-	// - calc hash sum
-	// - build image file path
-	// - check if the image already exists
-	// - store image
-	// - return the image file path
+	// check if image is empty
+	if len(image) == 0 {
+		return "", errors.New("image is empty")
+	}
 
-	return
+	// calc hash sum (this is [32]byte)
+	hash := sha256.Sum256(image)
+	// convert hash to hexadecimal string
+	hashHex := hex.EncodeToString(hash[:]) // 16進数のファイル名に変換
+	// add extension to the file name
+	ext := ".jpg"
+	fileName := hashHex + ext
+	// build image save path
+	savePath := filepath.Join(s.imgDirPath, fileName)
+
+	// check if the image already exists
+	_, err = os.Stat(savePath)
+	if err == nil {
+		return savePath, nil
+	}
+
+	// store image
+	err = os.WriteFile(savePath, image, 0644)
+	if err != nil {
+		return "", fmt.Errorf("failed to save image: %w", err)
+	}
+
+	// return the image file path
+	return savePath, nil
 }
 
 type GetImageRequest struct {
