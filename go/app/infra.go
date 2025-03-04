@@ -2,7 +2,10 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"os"
 	// STEP 5-1: uncomment this line
 	// _ "github.com/mattn/go-sqlite3"
 )
@@ -10,8 +13,9 @@ import (
 var errImageNotFound = errors.New("image not found")
 
 type Item struct {
-	ID   int    `db:"id" json:"-"`
-	Name string `db:"name" json:"name"`
+	ID   			int    `db:"id" json:"-"`
+	Name 			string `db:"name" json:"name"`
+	Category 	string `db:"category" json:"category"`
 }
 
 // Please run `go generate ./...` to generate the mock implementation
@@ -28,14 +32,68 @@ type itemRepository struct {
 	fileName string
 }
 
-// NewItemRepository creates a new itemRepository.
+// NewItemReposit creates a new itemRepository.
 func NewItemRepository() ItemRepository {
-	return &itemRepository{fileName: "items.json"}
+	return &itemRepository{fileName: "./db/items.json"}
 }
 
 // Insert inserts an item into the repository.
 func (i *itemRepository) Insert(ctx context.Context, item *Item) error {
-	// STEP 4-2: add an implementation to store an item
+	// STEP 4-1: add an implementation to store an item
+	// 既存データの読み込み
+	items, err := i.loadItems()
+	if err != nil {
+		return err
+	}
+
+	// 新規データの追加
+	items = append(items, *item)
+
+	// ファイルへの書き込み
+	return i.saveItems(items)
+}
+
+// loadItems loads items from the JSON file.
+func (i *itemRepository) loadItems() ([]Item, error) {
+	file, err := os.Open(i.fileName)
+	if err != nil {
+		return nil, err
+	}
+	// defer make sure the file is closed after the function returns
+	defer file.Close()
+
+	var items []Item
+	// make a new JSON decoder
+	decoder := json.NewDecoder(file)
+	// decode JSON from the file and store it in the items variable
+	err = decoder.Decode(&items)
+	if err != nil {
+		fmt.Println("decode error")
+		return nil, err
+	}
+
+	// debug print
+	fmt.Println(items)
+
+	return items, nil
+}
+
+// saveItems saves items to the JSON file.
+func (i *itemRepository) saveItems(items []Item) error {
+	file, err := os.Create(i.fileName)
+	if err != nil {
+		return err
+	}
+	// defer make sure the file is closed after the function returns
+	defer file.Close()
+
+	// make a new JSON encoder
+	encoder := json.NewEncoder(file)
+	// encode items to JSON and write it to the file
+	err = encoder.Encode(items)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
