@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"io"
 	// STEP 5-1: uncomment this line
 	// _ "github.com/mattn/go-sqlite3"
 )
@@ -54,6 +55,13 @@ func (i *itemRepository) Insert(ctx context.Context, item *Item) error {
 
 // loadItems loads items from the JSON file.
 func (i *itemRepository) loadItems() ([]Item, error) {
+	// check if the file exists
+	if _, err := os.Stat(i.fileName); os.IsNotExist(err) {
+		// if the file doesn't exist, return an empty slice
+		// {} means an empty slice and cast it to []Item
+		return []Item{}, nil
+	} 
+	// open the file
 	file, err := os.Open(i.fileName)
 	if err != nil {
 		return nil, err
@@ -67,6 +75,10 @@ func (i *itemRepository) loadItems() ([]Item, error) {
 	// decode JSON from the file and store it in the items variable
 	err = decoder.Decode(&items)
 	if err != nil {
+		if err == io.EOF {
+			// if the file is empty, return an empty slice
+			return []Item{}, nil
+		}
 		return nil, err
 	}
 
