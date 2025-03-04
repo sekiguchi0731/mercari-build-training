@@ -43,6 +43,7 @@ func (s Server) Run() int {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", h.Hello)
 	mux.HandleFunc("POST /items", h.AddItem)
+	mux.HandleFunc("GET /items", h.GetItem)
 	mux.HandleFunc("GET /images/{filename}", h.GetImage)
 
 	// start the server
@@ -145,6 +146,29 @@ func (s *Handlers) AddItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := AddItemResponse{Message: message}
+	err = json.NewEncoder(w).Encode(resp)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+// GetItemResponse is a response for GET / items.
+type GetItemResponse struct {
+	// make sure to change the field name to "items"
+	// the field name should be the same as the JSON response
+	Items []Item `json:"items"`
+}
+
+// AddItem is a handler to add a new item for GET /items .
+// Hello is a handler to return a Hello, world! message for GET / .
+func (s *Handlers) GetItem(w http.ResponseWriter, r *http.Request) {
+	items, err := s.itemRepo.GetItems()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	resp := GetItemResponse{Items: items}
 	err = json.NewEncoder(w).Encode(resp)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
