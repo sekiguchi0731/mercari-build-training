@@ -95,10 +95,7 @@ func parseAddItemRequest(r *http.Request) (*AddItemRequest, error) {
 		Name: r.FormValue("name"),
 		Category: r.FormValue("category"),
 		Image: []byte(r.FormValue("image")),
-		// STEP 4-2: add a category field
 	}
-
-	// STEP 4-4: add an image field
 
 	// validate the request
 	if req.Name == "" {
@@ -113,6 +110,11 @@ func parseAddItemRequest(r *http.Request) (*AddItemRequest, error) {
 	// STEP 4-4: validate the image field
 	if req.Image == nil {
 		return nil, errors.New("image is required")
+	}
+
+	// STEP 4-4: validate the image file name
+	if !strings.HasSuffix(string(req.Image), ".jpg") {
+		return nil, errors.New("image file must be a .jpg")
 	}
 
 	return req, nil
@@ -140,7 +142,6 @@ func (s *Handlers) AddItem(w http.ResponseWriter, r *http.Request) {
 		Name: req.Name,
 		Category: req.Category,
 		ImageName: fileName,
-		// STEP 4-4: add an image field
 	}
 	message := fmt.Sprintf("item received: %s, category received: %s, image name received: %s" , item.Name, item.Category, item.ImageName)
 	slog.Info(message)
