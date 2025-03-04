@@ -24,6 +24,7 @@ type Item struct {
 //go:generate go run go.uber.org/mock/mockgen -source=$GOFILE -package=${GOPACKAGE} -destination=./mock_$GOFILE
 type ItemRepository interface {
 	Insert(ctx context.Context, item *Item) error
+	GetItems() ([]Item, error)
 }
 
 // itemRepository is an implementation of ItemRepository
@@ -51,6 +52,11 @@ func (i *itemRepository) Insert(ctx context.Context, item *Item) error {
 
 	// ファイルへの書き込み
 	return i.saveItems(items)
+}
+
+// GetItems returns all items from the repository.
+func (i *itemRepository) GetItems() ([]Item, error) {
+	return i.loadItems()
 }
 
 // loadItems loads items from the JSON file.
