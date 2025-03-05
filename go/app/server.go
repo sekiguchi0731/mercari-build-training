@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"crypto/sha256"
 	"encoding/hex"
@@ -47,6 +48,7 @@ func (s Server) Run() int {
 	mux.HandleFunc("POST /items", h.AddItem)
 	mux.HandleFunc("GET /items", h.GetItem)
 	mux.HandleFunc("GET /images/{filename}", h.GetImage)
+	mux.HandleFunc("GET /items/{id}", h.GetItemByID)
 
 	// start the server
 	slog.Info("http server started on", "port", s.Port)
@@ -264,6 +266,47 @@ func (s *Handlers) GetImage(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("returned image", "path", imgPath)
 	http.ServeFile(w, r, imgPath)
+}
+
+// parseGetItemByID parses and validates the request to get an item by id.
+func parseGetItemByID(r *http.Request) (int, error) {
+	idStr := r.PathValue("id")
+
+	// validate the request
+	if idStr == "" {
+		return -1, errors.New("id is required")
+	}
+
+	// convert the id to an integer
+	return strconv.Atoi(idStr)
+}
+
+// GetItemByID is a handler to return an item by id for GET /items/{id} .
+func (s *Handlers) GetItemByID(w http.ResponseWriter, r *http.Request) {
+	// parse the request
+	id, err := parseGetItemByID(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	// get items
+	items, err := s.itemRepo.GetItems()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// validate the id
+	if id < 0 || id >= len(items) {
+		http.Error(w, "Index out of range", http.StatusNotFound)
+		return
+	}
+	// return the item
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(items[id])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 // buildImagePath builds the image path and validates it.
