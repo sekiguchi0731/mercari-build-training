@@ -114,9 +114,19 @@ func parseAddItemRequest(r *http.Request) (*AddItemRequest, error) {
 		return nil, errors.New("image is required")
 	}
 
+	// get the image path name
+	imagePath := string(req.Image)
+
 	// STEP 4-4: validate the image file name
-	if !strings.HasSuffix(string(req.Image), ".jpg") {
+	if !strings.HasSuffix(imagePath, ".jpg") {
 		return nil, errors.New("image file must be a .jpg")
+	} 
+
+	// STEP 4-4: validate the image file
+	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
+		return nil, errors.New("image file does not exist")
+	} else if err != nil {
+		return nil, errors.New("failed to check image file")
 	}
 
 	return req, nil
