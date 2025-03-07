@@ -26,13 +26,15 @@ func TestParseAddItemRequest(t *testing.T) {
 	}{
 		"ok: valid request": {
 			args: map[string]string{
-				"name":     "", // fill here
-				"category": "", // fill here
+				"name":     "jacket", 
+				"category": "fashion", 
+				"image": 		"../images/dummy.jpg", 
 			},
 			wants: wants{
 				req: &AddItemRequest{
-					Name: "", // fill here
-					// Category: "", // fill here
+					Name: "jacket",
+					Category: "fashion", 
+					Image: []byte("../images/dummy.jpg"),
 				},
 				err: false,
 			},
@@ -57,7 +59,7 @@ func TestParseAddItemRequest(t *testing.T) {
 			}
 
 			// prepare HTTP request
-			req, err := http.NewRequest("POST", "http://localhost:9000/items", strings.NewReader(values.Encode()))
+			req, err := http.NewRequest("POST", "http://localhost:9001/items", strings.NewReader(values.Encode()))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
