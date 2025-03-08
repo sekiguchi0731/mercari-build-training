@@ -1,12 +1,13 @@
 package app
 
 import (
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
-	"encoding/json"
 
 	"github.com/google/go-cmp/cmp"
 	"go.uber.org/mock/gomock"
@@ -135,10 +136,12 @@ func TestAddItem(t *testing.T) {
 			args: map[string]string{
 				"name":     "used iPhone 16e",
 				"category": "phone",
+				"image": 		"../images/dummy.jpg",
 			},
 			injector: func(m *MockItemRepository) {
 				// STEP 6-3: define mock expectation
 				// succeeded to insert
+				m.EXPECT().Insert(gomock.Any(), gomock.Any()).Return(nil)
 			},
 			wants: wants{
 				code: http.StatusOK,
@@ -148,10 +151,12 @@ func TestAddItem(t *testing.T) {
 			args: map[string]string{
 				"name":     "used iPhone 16e",
 				"category": "phone",
+				"image": 		"../images/dummy.jpg",
 			},
 			injector: func(m *MockItemRepository) {
 				// STEP 6-3: define mock expectation
 				// failed to insert
+				m.EXPECT().Insert(gomock.Any(), gomock.Any()).Return(errors.New("failed to insert"))
 			},
 			wants: wants{
 				code: http.StatusInternalServerError,
@@ -167,8 +172,10 @@ func TestAddItem(t *testing.T) {
 
 			mockIR := NewMockItemRepository(ctrl)
 			tt.injector(mockIR)
-			h := &Handlers{itemRepo: mockIR}
-
+			h := &Handlers{
+				imgDirPath: "../images/",
+				itemRepo: mockIR,
+			}
 			values := url.Values{}
 			for k, v := range tt.args {
 				values.Set(k, v)
@@ -185,8 +192,13 @@ func TestAddItem(t *testing.T) {
 			if tt.wants.code >= 400 {
 				return
 			}
-
-			for _, v := range tt.args {
+			hashedPath, err := h.storeImage([]byte(tt.args["image"]))
+			if err != nil {
+				t.Errorf("failed to store image: ")
+			}
+			expected := tt.args
+			expected["image"] = hashedPath
+			for _, v := range expected {
 				if !strings.Contains(rr.Body.String(), v) {
 					t.Errorf("response body does not contain %s, got: %s", v, rr.Body.String())
 				}
