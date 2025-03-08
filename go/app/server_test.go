@@ -1,15 +1,15 @@
 package app
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
-	"os"
-	"database/sql"
 
 	"github.com/google/go-cmp/cmp"
 	"go.uber.org/mock/gomock"
@@ -236,6 +236,7 @@ func TestAddItemE2e(t *testing.T) {
 			args: map[string]string{
 				"name":     "used iPhone 16e",
 				"category": "phone",
+				"image": 		"../images/dummy.jpg",
 			},
 			wants: wants{
 				code: http.StatusOK,
@@ -245,6 +246,7 @@ func TestAddItemE2e(t *testing.T) {
 			args: map[string]string{
 				"name":     "",
 				"category": "phone",
+				"image": 		"../images/dummy.jpg",
 			},
 			wants: wants{
 				code: http.StatusBadRequest,
@@ -254,7 +256,10 @@ func TestAddItemE2e(t *testing.T) {
 
 	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
-			h := &Handlers{itemRepo: &itemRepository{db: db}}
+			h := &Handlers{
+				imgDirPath: "../images/",
+				itemRepo: &itemRepository{db: db},
+			}
 
 			values := url.Values{}
 			for k, v := range tt.args {
@@ -273,14 +278,37 @@ func TestAddItemE2e(t *testing.T) {
 			if tt.wants.code >= 400 {
 				return
 			}
-			
-			for _, v := range tt.args {
+
+			// check response body
+			hashedPath, err := h.storeImage([]byte(tt.args["image"]))
+			if err != nil {
+				t.Errorf("failed to store image: ")
+			}
+			expected := tt.args
+			expected["image"] = hashedPath
+			for _, v := range expected {
 				if !strings.Contains(rr.Body.String(), v) {
 					t.Errorf("response body does not contain %s, got: %s", v, rr.Body.String())
 				}
 			}
 
 			// STEP 6-4: check inserted data
+			var gotItem Item
+			err = db.QueryRow("SELECT name, category, image_name FROM items WHERE name = ?", tt.args["name"]).
+			Scan(&gotItem.Name, &gotItem.Category, &gotItem.ImageName)
+			if err != nil {
+				t.Fatalf("failed to fetch item from database: %v", err)
+			}
+
+			if gotItem.Name != expected["name"] {
+				t.Errorf("expected name %s, got %s", expected["name"], gotItem.Name)
+			}
+			if gotItem.Category != expected["category"] {
+				t.Errorf("expected category %s, got %s", expected["category"], gotItem.Category)
+			}
+			if gotItem.ImageName != expected["image"] {
+				t.Errorf("expected image name %s, got %s", expected["image"], gotItem.ImageName)
+			}
 		})
 	}
 }
@@ -318,8 +346,9 @@ func setupDB(t *testing.T) (db *sql.DB, closers []func(), e error) {
 	// TODO: replace it with real SQL statements.
 	cmd := `CREATE TABLE IF NOT EXISTS items (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		name VARCHAR(255),
-		category VARCHAR(255)
+    name TEXT NOT NULL,
+    category TEXT NOT NULL,
+    image_name TEXT NOT NULL
 	)`
 	_, err = db.Exec(cmd)
 	if err != nil {
