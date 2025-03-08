@@ -39,7 +39,11 @@ func (s Server) Run() int {
 	// STEP 5-1: set up the database connection
 
 	// set up handlers
-	itemRepo := NewItemRepository()
+	itemRepo, err := NewItemRepository("file:./db/mercari.sqlite3?mode=rwc")
+	if err != nil {
+		slog.Error("failed to create item repository: ", "error", err)
+		return 1
+	}
 	h := &Handlers{imgDirPath: s.ImageDirPath, itemRepo: itemRepo}
 
 	// set up routes
@@ -52,7 +56,7 @@ func (s Server) Run() int {
 
 	// start the server
 	slog.Info("http server started on", "port", s.Port)
-	err := http.ListenAndServe(":"+s.Port, simpleCORSMiddleware(simpleLoggerMiddleware(mux), frontURL, []string{"GET", "HEAD", "POST", "OPTIONS"}))
+	err = http.ListenAndServe(":"+s.Port, simpleCORSMiddleware(simpleLoggerMiddleware(mux), frontURL, []string{"GET", "HEAD", "POST", "OPTIONS"}))
 	if err != nil {
 		slog.Error("failed to start server: ", "error", err)
 		return 1
@@ -158,7 +162,7 @@ func (s *Handlers) AddItem(w http.ResponseWriter, r *http.Request) {
 	message := fmt.Sprintf("item received: %s, category received: %s, image name received: %s" , item.Name, item.Category, item.ImageName)
 	slog.Info(message)
 
-	// STEP 4-2: add an implementation to store an item
+	// store an item in the db
 	err = s.itemRepo.Insert(ctx, item)
 	if err != nil {
 		slog.Error("failed to store item: ", "error", err)
@@ -182,7 +186,6 @@ type GetItemResponse struct {
 }
 
 // AddItem is a handler to add a new item for GET /items .
-// Hello is a handler to return a Hello, world! message for GET / .
 func (s *Handlers) GetItem(w http.ResponseWriter, r *http.Request) {
 	items, err := s.itemRepo.GetItems()
 	if err != nil {
