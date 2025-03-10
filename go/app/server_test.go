@@ -1,9 +1,13 @@
 package app
 
 import (
+	"database/sql"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 
@@ -26,13 +30,15 @@ func TestParseAddItemRequest(t *testing.T) {
 	}{
 		"ok: valid request": {
 			args: map[string]string{
-				"name":     "", // fill here
-				"category": "", // fill here
+				"name":     "jacket", 
+				"category": "fashion", 
+				"image": 		"../images/dummy.jpg", 
 			},
 			wants: wants{
 				req: &AddItemRequest{
-					Name: "", // fill here
-					// Category: "", // fill here
+					Name: "jacket",
+					Category: "fashion", 
+					Image: []byte("../images/dummy.jpg"),
 				},
 				err: false,
 			},
@@ -57,7 +63,7 @@ func TestParseAddItemRequest(t *testing.T) {
 			}
 
 			// prepare HTTP request
-			req, err := http.NewRequest("POST", "http://localhost:9000/items", strings.NewReader(values.Encode()))
+			req, err := http.NewRequest("POST", "http://localhost:9001/items", strings.NewReader(values.Encode()))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
@@ -85,14 +91,14 @@ func TestHelloHandler(t *testing.T) {
 
 	// Please comment out for STEP 6-2
 	// predefine what we want
-	// type wants struct {
-	// 	code int               // desired HTTP status code
-	// 	body map[string]string // desired body
-	// }
-	// want := wants{
-	// 	code: http.StatusOK,
-	// 	body: map[string]string{"message": "Hello, world!"},
-	// }
+	type wants struct {
+		code int               // desired HTTP status code
+		body map[string]string // desired body
+	}
+	want := wants{
+		code: http.StatusOK,
+		body: map[string]string{"message": "Hello, world!"},
+	}
 
 	// set up test
 	req := httptest.NewRequest("GET", "/hello", nil)
@@ -102,8 +108,19 @@ func TestHelloHandler(t *testing.T) {
 	h.Hello(res, req)
 
 	// STEP 6-2: confirm the status code
+	if res.Code != want.code {
+		t.Errorf("expected status code %d, got %d", want.code, res.Code)
+	}
 
 	// STEP 6-2: confirm response body
+	var gotBody map[string]string
+	if err := json.NewDecoder(res.Body).Decode(&gotBody); err != nil {
+		t.Fatalf("failed to decode response body: %v", err)
+	}
+
+	if diff := cmp.Diff(want.body, gotBody); diff != "" {
+		t.Errorf("unexpected response body (-want +got): \n%s", diff)
+	}
 }
 
 func TestAddItem(t *testing.T) {
@@ -121,10 +138,12 @@ func TestAddItem(t *testing.T) {
 			args: map[string]string{
 				"name":     "used iPhone 16e",
 				"category": "phone",
+				"image": 		"../images/dummy.jpg",
 			},
 			injector: func(m *MockItemRepository) {
 				// STEP 6-3: define mock expectation
 				// succeeded to insert
+				m.EXPECT().Insert(gomock.Any(), gomock.Any()).Return(nil)
 			},
 			wants: wants{
 				code: http.StatusOK,
@@ -134,10 +153,12 @@ func TestAddItem(t *testing.T) {
 			args: map[string]string{
 				"name":     "used iPhone 16e",
 				"category": "phone",
+				"image": 		"../images/dummy.jpg",
 			},
 			injector: func(m *MockItemRepository) {
 				// STEP 6-3: define mock expectation
 				// failed to insert
+				m.EXPECT().Insert(gomock.Any(), gomock.Any()).Return(errors.New("failed to insert"))
 			},
 			wants: wants{
 				code: http.StatusInternalServerError,
@@ -153,8 +174,10 @@ func TestAddItem(t *testing.T) {
 
 			mockIR := NewMockItemRepository(ctrl)
 			tt.injector(mockIR)
-			h := &Handlers{itemRepo: mockIR}
-
+			h := &Handlers{
+				imgDirPath: "../images/",
+				itemRepo: mockIR,
+			}
 			values := url.Values{}
 			for k, v := range tt.args {
 				values.Set(k, v)
@@ -171,8 +194,13 @@ func TestAddItem(t *testing.T) {
 			if tt.wants.code >= 400 {
 				return
 			}
-
-			for _, v := range tt.args {
+			hashedPath, err := h.storeImage([]byte(tt.args["image"]))
+			if err != nil {
+				t.Errorf("failed to store image: ")
+			}
+			expected := tt.args
+			expected["image"] = hashedPath
+			for _, v := range expected {
 				if !strings.Contains(rr.Body.String(), v) {
 					t.Errorf("response body does not contain %s, got: %s", v, rr.Body.String())
 				}
@@ -182,120 +210,150 @@ func TestAddItem(t *testing.T) {
 }
 
 // STEP 6-4: uncomment this test
-// func TestAddItemE2e(t *testing.T) {
-// 	if testing.Short() {
-// 		t.Skip("skipping e2e test")
-// 	}
+func TestAddItemE2e(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping e2e test")
+	}
 
-// 	db, closers, err := setupDB(t)
-// 	if err != nil {
-// 		t.Fatalf("failed to set up database: %v", err)
-// 	}
-// 	t.Cleanup(func() {
-// 		for _, c := range closers {
-// 			c()
-// 		}
-// 	})
+	db, closers, err := setupDB(t)
+	if err != nil {
+		t.Fatalf("failed to set up database: %v", err)
+	}
+	t.Cleanup(func() {
+		for _, c := range closers {
+			c()
+		}
+	})
 
-// 	type wants struct {
-// 		code int
-// 	}
-// 	cases := map[string]struct {
-// 		args map[string]string
-// 		wants
-// 	}{
-// 		"ok: correctly inserted": {
-// 			args: map[string]string{
-// 				"name":     "used iPhone 16e",
-// 				"category": "phone",
-// 			},
-// 			wants: wants{
-// 				code: http.StatusOK,
-// 			},
-// 		},
-// 		"ng: failed to insert": {
-// 			args: map[string]string{
-// 				"name":     "",
-// 				"category": "phone",
-// 			},
-// 			wants: wants{
-// 				code: http.StatusBadRequest,
-// 			},
-// 		},
-// 	}
+	type wants struct {
+		code int
+	}
+	cases := map[string]struct {
+		args map[string]string
+		wants
+	}{
+		"ok: correctly inserted": {
+			args: map[string]string{
+				"name":     "used iPhone 16e",
+				"category": "phone",
+				"image": 		"../images/dummy.jpg",
+			},
+			wants: wants{
+				code: http.StatusOK,
+			},
+		},
+		"ng: failed to insert": {
+			args: map[string]string{
+				"name":     "",
+				"category": "phone",
+				"image": 		"../images/dummy.jpg",
+			},
+			wants: wants{
+				code: http.StatusBadRequest,
+			},
+		},
+	}
 
-// 	for name, tt := range cases {
-// 		t.Run(name, func(t *testing.T) {
-// 			h := &Handlers{itemRepo: &itemRepository{db: db}}
+	for name, tt := range cases {
+		t.Run(name, func(t *testing.T) {
+			h := &Handlers{
+				imgDirPath: "../images/",
+				itemRepo: &itemRepository{db: db},
+			}
 
-// 			values := url.Values{}
-// 			for k, v := range tt.args {
-// 				values.Set(k, v)
-// 			}
-// 			req := httptest.NewRequest("POST", "/items", strings.NewReader(values.Encode()))
-// 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			values := url.Values{}
+			for k, v := range tt.args {
+				values.Set(k, v)
+			}
+			req := httptest.NewRequest("POST", "/items", strings.NewReader(values.Encode()))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-// 			rr := httptest.NewRecorder()
-// 			h.AddItem(rr, req)
+			rr := httptest.NewRecorder()
+			h.AddItem(rr, req)
 
-// 			// check response
-// 			if tt.wants.code != rr.Code {
-// 				t.Errorf("expected status code %d, got %d", tt.wants.code, rr.Code)
-// 			}
-// 			if tt.wants.code >= 400 {
-// 				return
-// 			}
-// 			for _, v := range tt.args {
-// 				if !strings.Contains(rr.Body.String(), v) {
-// 					t.Errorf("response body does not contain %s, got: %s", v, rr.Body.String())
-// 				}
-// 			}
+			// check response
+			if tt.wants.code != rr.Code {
+				t.Errorf("expected status code %d, got %d", tt.wants.code, rr.Code)
+			}
+			if tt.wants.code >= 400 {
+				return
+			}
 
-// 			// STEP 6-4: check inserted data
-// 		})
-// 	}
-// }
+			// check response body
+			hashedPath, err := h.storeImage([]byte(tt.args["image"]))
+			if err != nil {
+				t.Errorf("failed to store image: ")
+			}
+			expected := tt.args
+			expected["image"] = hashedPath
+			for _, v := range expected {
+				if !strings.Contains(rr.Body.String(), v) {
+					t.Errorf("response body does not contain %s, got: %s", v, rr.Body.String())
+				}
+			}
 
-// func setupDB(t *testing.T) (db *sql.DB, closers []func(), e error) {
-// 	t.Helper()
+			// STEP 6-4: check inserted data
+			var gotItem Item
+			err = db.QueryRow("SELECT name, category, image_name FROM items WHERE name = ?", tt.args["name"]).
+			Scan(&gotItem.Name, &gotItem.Category, &gotItem.ImageName)
+			if err != nil {
+				t.Fatalf("failed to fetch item from database: %v", err)
+			}
 
-// 	defer func() {
-// 		if e != nil {
-// 			for _, c := range closers {
-// 				c()
-// 			}
-// 		}
-// 	}()
+			if gotItem.Name != expected["name"] {
+				t.Errorf("expected name %s, got %s", expected["name"], gotItem.Name)
+			}
+			if gotItem.Category != expected["category"] {
+				t.Errorf("expected category %s, got %s", expected["category"], gotItem.Category)
+			}
+			if gotItem.ImageName != expected["image"] {
+				t.Errorf("expected image name %s, got %s", expected["image"], gotItem.ImageName)
+			}
+		})
+	}
+}
 
-// 	// create a temporary file for e2e testing
-// 	f, err := os.CreateTemp(".", "*.sqlite3")
-// 	if err != nil {
-// 		return nil, nil, err
-// 	}
-// 	closers = append(closers, func() {
-// 		f.Close()
-// 		os.Remove(f.Name())
-// 	})
+func setupDB(t *testing.T) (db *sql.DB, closers []func(), e error) {
+	t.Helper()
 
-// 	// set up tables
-// 	db, err = sql.Open("sqlite3", f.Name())
-// 	if err != nil {
-// 		return nil, nil, err
-// 	}
-// 	closers = append(closers, func() {
-// 		db.Close()
-// 	})
+	defer func() {
+		if e != nil {
+			for _, c := range closers {
+				c()
+			}
+		}
+	}()
 
-// 	// TODO: replace it with real SQL statements.
-// 	cmd := `CREATE TABLE IF NOT EXISTS items (
-// 		id INTEGER PRIMARY KEY AUTOINCREMENT,
-// 		name VARCHAR(255),
-// 		category VARCHAR(255)
-// 	)`
-// 	_, err = db.Exec(cmd)
-// 	if err != nil {
-// 		return nil, nil, err
-// 	}
+	// create a temporary file for e2e testing
+	f, err := os.CreateTemp(".", "*.sqlite3")
+	if err != nil {
+		return nil, nil, err
+	}
+	closers = append(closers, func() {
+		f.Close()
+		os.Remove(f.Name())
+	})
 
-// 	return db, closers, nil
-// }
+	// set up tables
+	db, err = sql.Open("sqlite3", f.Name())
+	if err != nil {
+		return nil, nil, err
+	}
+	closers = append(closers, func() {
+		db.Close()
+	})
+
+	// TODO: replace it with real SQL statements.
+	cmd := `CREATE TABLE IF NOT EXISTS items (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL,
+    image_name TEXT NOT NULL
+	)`
+	_, err = db.Exec(cmd)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return db, closers, nil
+}

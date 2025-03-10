@@ -2,12 +2,11 @@ package app
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"os"
-	"io"
+	"fmt"
 	// STEP 5-1: uncomment this line
-	// _ "github.com/mattn/go-sqlite3"
+	_ "github.com/mattn/go-sqlite3"
+	"database/sql"
 )
 
 var errImageNotFound = errors.New("image not found")
@@ -30,99 +29,65 @@ type ItemRepository interface {
 
 // itemRepository is an implementation of ItemRepository
 type itemRepository struct {
-	// fileName is the path to the JSON file storing items.
-	fileName string
+	// db is a database connection
+	db *sql.DB
 }
 
-// NewItemRepository creates a new itemRepository.
-func NewItemRepository() ItemRepository {
-	return &itemRepository{fileName: "./db/items.json"}
+// NewItemRepository connects db and creates a new itemRepository.
+func NewItemRepository(dbPath string) (ItemRepository, error) {
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to the database: %w", err)
+	}
+	// if the table does not exist, create it
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS items (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL,
+			category TEXT NOT NULL,
+			image_name TEXT NOT NULL
+		);
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create table: %w", err)
+	}
+	return &itemRepository{db: db}, nil
 }
 
 // Insert inserts an item into the repository.
 func (i *itemRepository) Insert(ctx context.Context, item *Item) error {
-	// STEP 4-2: add an implementation to store an item
-	// 既存データの読み込み
-	items, err := i.loadItems()
+	_, err := i.db.Exec(
+		"INSERT INTO items (name, category, image_name) VALUES (?, ?, ?)",
+		item.Name, item.Category, item.ImageName,
+	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to insert an item: %w", err)
 	}
-
-	// 新規データの追加
-	items = append(items, *item)
-
-	// ファイルへの書き込み
-	return i.saveItems(items)
+	return nil
 }
 
 // GetItems returns all items from the repository.
 func (i *itemRepository) GetItems() ([]Item, error) {
-	return i.loadItems()
-}
-
-// loadItems loads items from the JSON file.
-func (i *itemRepository) loadItems() ([]Item, error) {
-	// check if the file exists
-	if _, err := os.Stat(i.fileName); os.IsNotExist(err) {
-		// if the file doesn't exist, return an empty slice
-		// {} means an empty slice and cast it to []Item
-		return []Item{}, nil
-	} 
-	// open the file
-	file, err := os.Open(i.fileName)
+	rows, err := i.db.Query("SELECT id, name, category, image_name FROM items")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get items: %w", err)
 	}
-	// defer make sure the file is closed after the function returns
-	defer file.Close()
+	// defer make sure rows.Close() is called after the function returns
+	defer rows.Close()
 
 	var items []Item
-	// make a new JSON decoder
-	decoder := json.NewDecoder(file)
-	// decode JSON from the file and store it in the items variable
-	err = decoder.Decode(&items)
-	if err != nil {
-		if err == io.EOF {
-			// if the file is empty, return an empty slice
-			return []Item{}, nil
+	// iterate over the rows
+	for rows.Next() {
+		var item Item
+		err:= rows.Scan(&item.ID, &item.Name, &item.Category, &item.ImageName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
-		return nil, err
+		items = append(items, item)
 	}
-
 	return items, nil
 }
 
-// saveItems saves items to the JSON file.
-func (i *itemRepository) saveItems(items []Item) error {
-	var file *os.File
-	// check if the file exists
-	if _, err := os.Stat(i.fileName); os.IsNotExist(err) {
-		// if the file doesn't exist, create it
-		file, err = os.Create(i.fileName)
-		if err != nil {
-			return err
-		}
-	} else {
-		// if the file exists, open it and overwrite it
-		// O_WRONLY: write only, O_TRUNC: truncate the file
-		file, err = os.OpenFile(i.fileName, os.O_WRONLY|os.O_TRUNC, 0644)
-		if err != nil {
-			return err
-		}
-	}
-	// defer make sure the file is closed after the function returns
-	defer file.Close()
-
-	// make a new JSON encoder
-	encoder := json.NewEncoder(file)
-	// encode items to JSON and write it to the file
-	err := encoder.Encode(items)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
 
 // StoreImage stores an image and returns an error if any.
 // This package doesn't have a related interface for simplicity.
