@@ -31,6 +31,12 @@ RUN chmod -R u+rw db
 # Build the application binary and output it as '/app/mercari-app'
 RUN go build -o /app/mercari-app ./cmd/api
 
+# Change ownership of the images directory (now at /app/images)
+RUN chown -R trainee:mercari images
+
+# Grant trainee user read & write permissions for images directory
+RUN chmod -R u+rw images
+
 USER trainee
 
 # Set the command to execute the application when the container starts
