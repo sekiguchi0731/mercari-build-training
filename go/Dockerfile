@@ -5,7 +5,7 @@ FROM golang:1.24-alpine AS builder
 ENV CGO_ENABLED=1
 
 # Install necessary build dependencies for CGO and SQLite
-RUN apk add --no-cache gcc musl-dev sqlite
+RUN apk add --no-cache gcc musl-dev sqlite-dev
 
 # Set the working directory inside the container to `/app`
 WORKDIR /app
