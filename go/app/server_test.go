@@ -294,8 +294,12 @@ func TestAddItemE2e(t *testing.T) {
 
 			// STEP 6-4: check inserted data
 			var gotItem Item
-			err = db.QueryRow("SELECT name, category, image_name FROM items WHERE name = ?", tt.args["name"]).
-			Scan(&gotItem.Name, &gotItem.Category, &gotItem.ImageName)
+			err = db.QueryRow(`
+				SELECT i.name, c.name AS category, i.image_name
+				FROM items i
+				JOIN categories c ON i.category_id = c.id
+				WHERE i.name = ?`, tt.args["name"]).
+				Scan(&gotItem.Name, &gotItem.Category, &gotItem.ImageName)
 			if err != nil {
 				t.Fatalf("failed to fetch item from database: %v", err)
 			}
@@ -343,14 +347,14 @@ func setupDB(t *testing.T) (db *sql.DB, closers []func(), e error) {
 		db.Close()
 	})
 
-	// TODO: replace it with real SQL statements.
-	cmd := `CREATE TABLE IF NOT EXISTS items (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    category TEXT NOT NULL,
-    image_name TEXT NOT NULL
-	)`
-	_, err = db.Exec(cmd)
+	// read the schema
+	schemaBytes, err := os.ReadFile("../db/items.sql")
+	if err != nil {
+			return nil, nil, err
+	}
+
+	// create the table
+	_, err = db.Exec(string(schemaBytes))
 	if err != nil {
 		return nil, nil, err
 	}
