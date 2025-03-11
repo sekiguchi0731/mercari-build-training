@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+
 	// STEP 5-1: uncomment this line
-	_ "github.com/mattn/go-sqlite3"
 	"database/sql"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var errImageNotFound = errors.New("image not found")
@@ -39,15 +42,14 @@ func NewItemRepository(dbPath string) (ItemRepository, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to the database: %w", err)
 	}
-	// if the table does not exist, create it
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS items (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			name TEXT NOT NULL,
-			category TEXT NOT NULL,
-			image_name TEXT NOT NULL
-		);
-	`)
+	// if the table does not exist, read the schema
+	schemaBytes, err := os.ReadFile("db/items.sql")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read schema: %w", err)
+	}
+
+	// create the table
+	_, err = db.Exec(string(schemaBytes))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create table: %w", err)
 	}
@@ -56,9 +58,30 @@ func NewItemRepository(dbPath string) (ItemRepository, error) {
 
 // Insert inserts an item into the repository.
 func (i *itemRepository) Insert(ctx context.Context, item *Item) error {
-	_, err := i.db.Exec(
-		"INSERT INTO items (name, category, image_name) VALUES (?, ?, ?)",
-		item.Name, item.Category, item.ImageName,
+	// 
+	var categoryID int
+	err := i.db.QueryRowContext(ctx, "SELECT id FROM categories WHERE name = ?", item.Category).Scan(&categoryID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// insert a new category
+			result, err := i.db.ExecContext(ctx, "INSERT INTO categories (name) VALUES (?)", item.Category)
+			if err != nil {
+				return fmt.Errorf("failed to insert a category: %w", err)
+			}
+			newID, err := result.LastInsertId()
+			if err != nil {
+				return fmt.Errorf("failed to get new category ID: %w", err)
+			}
+			categoryID = int(newID)
+		} else {
+			return fmt.Errorf("failed to query category: %w", err)
+		}
+	}
+
+	// insert an item using the category ID
+	_, err = i.db.Exec(
+		"INSERT INTO items (name, category_id, image_name) VALUES (?, ?, ?)",
+		item.Name, categoryID, item.ImageName,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to insert an item: %w", err)
@@ -68,7 +91,11 @@ func (i *itemRepository) Insert(ctx context.Context, item *Item) error {
 
 // GetItems returns all items from the repository.
 func (i *itemRepository) GetItems() ([]Item, error) {
-	rows, err := i.db.Query("SELECT id, name, category, image_name FROM items")
+	rows, err := i.db.Query(`
+				SELECT i.id, i.name, c.name AS category, i.image_name 
+        FROM items i 
+        JOIN categories c ON i.category_id = c.id
+	`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get items: %w", err)
 	}
