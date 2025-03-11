@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+
 	// STEP 5-1: uncomment this line
-	_ "github.com/mattn/go-sqlite3"
 	"database/sql"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var errImageNotFound = errors.New("image not found")
@@ -39,15 +42,14 @@ func NewItemRepository(dbPath string) (ItemRepository, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to the database: %w", err)
 	}
-	// if the table does not exist, create it
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS items (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			name TEXT NOT NULL,
-			category TEXT NOT NULL,
-			image_name TEXT NOT NULL
-		);
-	`)
+	// if the table does not exist, read the schema
+	schemaBytes, err := os.ReadFile("db/items.sql")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read schema: %w", err)
+	}
+
+	// create the table
+	_, err = db.Exec(string(schemaBytes))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create table: %w", err)
 	}
