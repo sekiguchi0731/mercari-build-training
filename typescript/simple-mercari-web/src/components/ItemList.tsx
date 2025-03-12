@@ -39,6 +39,8 @@ export const ItemList = ({ reload, onLoadCompleted }: Prop) => {
               alt={item.name}
             />
             <p>
+              <span>ID: {item.id}</span>
+              <br />
               <span>Name: {item.name}</span>
               <br />
               <span>Category: {item.category}</span>

@@ -15,7 +15,7 @@ import (
 var errImageNotFound = errors.New("image not found")
 
 type Item struct {
-	ID   			int    `db:"id" json:"-"`
+	ID   			int    `db:"id" json:"id"`
 	Name 			string `db:"name" json:"name"`
 	Category 	string `db:"category" json:"category"`
 	ImageName string `db:"image_name" json:"image_name"`
