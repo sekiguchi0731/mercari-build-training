@@ -1,17 +1,18 @@
 package app
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"crypto/sha256"
-	"encoding/hex"
 )
 
 type Server struct {
@@ -100,7 +101,7 @@ func parseAddItemRequest(r *http.Request) (*AddItemRequest, error) {
 	req := &AddItemRequest{
 		Name: r.FormValue("name"),
 		Category: r.FormValue("category"),
-		Image: []byte(r.FormValue("image")),
+		// Image: []byte(r.FormValue("image")),
 	}
 
 	// validate the request
@@ -114,25 +115,35 @@ func parseAddItemRequest(r *http.Request) (*AddItemRequest, error) {
 	}
 
 	// STEP 4-4: validate the image field
-	if req.Image == nil {
+	file, header, err := r.FormFile("image")
+	if err != nil {
 		return nil, errors.New("image is required")
 	}
+	defer file.Close()
+	// if req.Image == nil {
+	// 	return nil, errors.New("image is required")
+	// }
 
-	// get the image path name
-	imagePath := string(req.Image)
+	// // get the image path name
+	// imagePath := string(req.Image)
 
 	// STEP 4-4: validate the image file name
-	if !strings.HasSuffix(imagePath, ".jpg") {
+	if !strings.HasSuffix(header.Filename, ".jpg") {
 		return nil, errors.New("image file must be a .jpg")
 	} 
 
 	// STEP 4-4: validate the image file
-	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
-		return nil, errors.New("image file does not exist")
-	} else if err != nil {
-		return nil, errors.New("failed to check image file")
+	// if _, err := os.Stat(imagePath); os.IsNotExist(err) {
+	// 	return nil, errors.New("image file does not exist")
+	// } else if err != nil {
+	// 	return nil, errors.New("failed to check image file")
+	// }
+	imageData, err := io.ReadAll(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read image file: %w", err)
 	}
 
+	req.Image = imageData
 	return req, nil
 }
 
