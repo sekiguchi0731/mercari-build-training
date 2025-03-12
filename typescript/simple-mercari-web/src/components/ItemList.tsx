@@ -29,7 +29,7 @@ export const ItemList = ({ reload, onLoadCompleted }: Prop) => {
   }, [reload, onLoadCompleted]);
 
   return (
-    <div>
+    <div className='ItemField'>
       {items?.map((item) => {
         return (
           <div key={item.id} className="ItemList">
