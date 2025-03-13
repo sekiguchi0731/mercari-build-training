@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  backend:
+    build: ./go
+    ports:
+      - "9001:9001"  # ホスト:コンテナのポート
+    volumes:
+      - ./go/db:/app/db
+      - ./go/images:/app/images
+    environment:
+      - FRONT_URL=http://localhost:3000  # フロントエンドのURL
+    networks:
+      - app-network
+
+  frontend:
+    build: ./typescript/simple-mercari-web
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./typescript/simple-mercari-web:/app
+    environment:
+      - VITE_BACKEND_URL=http://localhost:9001
+    depends_on:
+      - backend  # バックエンドが起動してからフロントエンドを起動
+    networks:
+      - app-network
+
+
+networks:
+  app-network:
+    driver: bridge
