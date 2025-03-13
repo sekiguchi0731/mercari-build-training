@@ -5,7 +5,7 @@ FROM golang:1.24-alpine AS builder
 ENV CGO_ENABLED=1
 
 # Install necessary build dependencies for CGO and SQLite
-RUN apk add --no-cache gcc musl-dev sqlite
+RUN apk add --no-cache gcc musl-dev sqlite-dev
 
 # Set the working directory inside the container to `/app`
 WORKDIR /app
@@ -30,6 +30,12 @@ RUN chmod -R u+rw db
 
 # Build the application binary and output it as '/app/mercari-app'
 RUN go build -o /app/mercari-app ./cmd/api
+
+# Change ownership of the images directory (now at /app/images)
+RUN chown -R trainee:mercari images
+
+# Grant trainee user read & write permissions for images directory
+RUN chmod -R u+rw images
 
 USER trainee
 

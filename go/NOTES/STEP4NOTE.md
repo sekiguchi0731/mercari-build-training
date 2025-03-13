@@ -30,9 +30,11 @@ func main() {
 }
 ```
 
-## `Run`メソッド
+---
 
-### メソッドと関数
+`Run`メソッド
+
+## メソッドと関数
 
 ```go
 func (s Server) Run() int {..}
@@ -49,11 +51,11 @@ Goでは，**関数とメソッドは異なる概念**
 - **メソッド**：
   - 構造体に紐づいた関数
 
-### レシーバー
+## レシーバー
 
 オブジェクト指向言語における，`this`（**=自分自身のインスタンスを指す特別な変数**）のような役割をする．
 
-#### レシーバー名
+### レシーバー名
 
 レシーバー名が異なっていても，**同じ構造体に追加**される！
 
@@ -90,7 +92,7 @@ func main() {
 
 ちなみに，`s.Run()`は`Run()`内で実行できるが，無限ループに注意する．
 
-#### 値渡しと参照渡し
+### 値渡しと参照渡し
 
 ポインタレシーバーも利用可能
 
@@ -118,7 +120,7 @@ func main() {
 }
 ```
 
-### ロガー
+## ロガー
 
 プログラムの動作を記録（ログ出力）するツール
 
@@ -142,7 +144,7 @@ import (
   slog.SetLogLoggerLevel(slog.LevelInfo)
 ```
 
-#### STEP 4-6
+### STEP 4-6
 
 **Goのログレベル**
 
@@ -166,7 +168,9 @@ slog.Warn("This is a warning log") // ✅ 出力される
 slog.Error("This is an error log") // ✅ 出力される
 ```
 
-### ハンドラ関数
+## ハンドラ関数
+
+### 指定方法
 
 ```go
 mux.HandleFunc("メソッド /パス", ハンドラー関数)
@@ -181,6 +185,46 @@ Go の HTTP ルーター (http.ServeMux) に`メソッド /パス`というリ�
 ```go
 mux.HandleFunc("GET /items/{index}", h.GetItemByIndex)
 ```
+
+### 引数
+
+Go のハンドラ関数（`http.HandlerFunc`）の定義：
+
+```go
+func(w http.ResponseWriter, r *http.Request)
+```
+
+- `w http.ResponseWriter` → レスポンスの書き込み先
+- `r *http.Request` → リクエスト情報
+
+#### 第一引数：`w`
+
+例えば，以下のハンドラ関数
+
+```go
+func (h *Handlers) Hello(w http.ResponseWriter, r *http.Request) {
+    w.WriteHeader(http.StatusOK) // ステータスコードを書き込む
+    json.NewEncoder(w).Encode(map[string]string{"message": "Hello, world!"}) // JSONレスポンスを書き込む
+}
+```
+
+1. `w.WriteHeader(http.StatusOK)` → ステータスコードを`w`に書き込む
+2. `json.NewEncoder(w).Encode(...)` → JSONを`w`に書き込む
+
+**内部的な動作**：
+
+`http.ResponseWriter`はインタフェースである．
+
+- Goでは，インタフェースの実態はポインタ型
+  - 参照渡しと似た動作をする．
+
+したがって，内部では`res`のアドレス（ポインタ）が渡される
+
+Go は明示的な「参照渡し（&res）」はしないが，結果的に参照渡しと似た動作をする．
+
+`h.Hello(res, req)` の実行後，`res`の値が変わるのは，ハンドラが`res`にレスポンスを書き込んだから．
+
+#### 第二引数：`r`
 
 ハンドラ関数内の`r`には，
 
@@ -231,10 +275,9 @@ func (s *Handlers) GetItemByIndex(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
+---
 
-
-
-## `AddItem`メソッド
+`AddItem`メソッド
 
 ### 入力
 
@@ -597,4 +640,5 @@ fmt.Println(string(b)) // "Hello"
 - ただし，今回は
 
 > 文字列で保存
-  とあるように，`FormValue`として扱う
+
+とあるように，`FormValue`として扱う
