@@ -2,30 +2,24 @@ version: "3.9"
 
 services:
   backend:
-    build: ./go
+    image: ghcr.io/sekiguchi0731/mercari-build-training:step9
     ports:
-      - "9001:9001"  # ホスト:コンテナのポート
-    volumes:
-      - ./go/db:/app/db
-      - ./go/images:/app/images
+      - "9001:9001"
     environment:
-      - FRONT_URL=http://localhost:3000  # フロントエンドのURL
+      - FRONT_URL=http://localhost:3000
     networks:
       - app-network
 
   frontend:
-    build: ./typescript/simple-mercari-web
+    image: mercari-build-training/web:latest
     ports:
       - "3000:3000"
-    volumes:
-      - ./typescript/simple-mercari-web:/app
     environment:
       - VITE_BACKEND_URL=http://localhost:9001
     depends_on:
-      - backend  # バックエンドが起動してからフロントエンドを起動
+      - backend
     networks:
       - app-network
-
 
 networks:
   app-network:
