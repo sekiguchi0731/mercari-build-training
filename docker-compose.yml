@@ -1,0 +1,26 @@
+version: "3.9"
+
+services:
+  backend:
+    image: ghcr.io/sekiguchi0731/mercari-build-training:step9
+    ports:
+      - "9001:9001"
+    environment:
+      - FRONT_URL=http://localhost:3000
+    networks:
+      - app-network
+
+  frontend:
+    image: mercari-build-training/web:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_BACKEND_URL=http://localhost:9001
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
